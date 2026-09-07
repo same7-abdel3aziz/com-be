@@ -1,0 +1,105 @@
+trigger: none
+
+pool:
+  name: DEV-POOL-CONTROL
+
+steps:
+- powershell: |
+    Write-Host "========================================"
+    Write-Host "        WINDOWS VM INFORMATION"
+    Write-Host "========================================"
+
+    Write-Host "`n=== HOSTNAME ==="
+    hostname
+
+    Write-Host "`n=== WINDOWS ==="
+    Get-CimInstance Win32_OperatingSystem |
+        Select-Object Caption, Version, BuildNumber
+
+    Write-Host "`n=== CPU ==="
+    Get-CimInstance Win32_Processor |
+        Select-Object Name, NumberOfCores, NumberOfLogicalProcessors
+
+    Write-Host "`n=== MEMORY ==="
+    $memory = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory
+    Write-Host "RAM: $([math]::Round($memory / 1GB, 2)) GB"
+
+    Write-Host "`n=== IIS ==="
+    $iis = Get-Service W3SVC -ErrorAction SilentlyContinue
+
+    if ($iis) {
+        Write-Host "IIS: Installed"
+        Write-Host "W3SVC Status: $($iis.Status)"
+    }
+    else {
+        Write-Host "IIS: Not Installed"
+    }
+
+    Write-Host "`n=== IIS WEBSITES ==="
+    Import-Module WebAdministration -ErrorAction SilentlyContinue
+
+    if (Get-Module -Name WebAdministration) {
+        $sites = Get-Website -ErrorAction SilentlyContinue
+
+        if ($sites) {
+            $sites | Select-Object Name, State, PhysicalPath
+        }
+        else {
+            Write-Host "No IIS websites found."
+        }
+    }
+    else {
+        Write-Host "WebAdministration module not available."
+    }
+
+    Write-Host "`n=== SQL SERVER ==="
+    $sqlServices = Get-Service |
+        Where-Object {
+            $_.Name -like "MSSQL*" -or
+            $_.DisplayName -like "*SQL Server*"
+        }
+
+    if ($sqlServices) {
+        $sqlServices |
+            Select-Object Name, DisplayName, Status
+    }
+    else {
+        Write-Host "SQL Server: Not Found"
+    }
+
+    Write-Host "`n=== .NET ==="
+    $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
+
+    if ($dotnet) {
+        Write-Host "dotnet:"
+        dotnet --version
+
+        Write-Host "`nInstalled .NET SDKs:"
+        dotnet --list-sdks
+
+        Write-Host "`nInstalled .NET Runtimes:"
+        dotnet --list-runtimes
+    }
+    else {
+        Write-Host "dotnet CLI: Not Installed"
+    }
+
+    Write-Host "`n=== AZURE DEVOPS AGENT ==="
+    $agent = Get-Service |
+        Where-Object {
+            $_.DisplayName -like "*Azure Pipelines*" -or
+            $_.DisplayName -like "*Azure DevOps*"
+        }
+
+    if ($agent) {
+        $agent | Select-Object Name, DisplayName, Status
+    }
+    else {
+        Write-Host "Azure DevOps Agent service not found."
+    }
+
+    Write-Host "`n========================================"
+    Write-Host "        DISCOVERY COMPLETED"
+    Write-Host "========================================"
+
+  displayName: "Basic VM Discovery"
