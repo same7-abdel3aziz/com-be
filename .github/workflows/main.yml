@@ -1,0 +1,39 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted
+
+    steps:
+    - name: 'Checkout'
+      uses: actions/checkout@v4
+
+    - name: 'Set up .NET Core'
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10
+
+    - name: 'Restore dependencies'
+      run: dotnet restore 'CompetitionManagementSystem.csproj'
+
+    - name: 'Build solution'
+      run: dotnet build 'CompetitionManagementSystem.csproj' --configuration Release --no-restore
+
+    - name: 'Publish Coding'
+      run: dotnet publish 'CompetitionManagementSystem.csproj' --configuration Release --no-build --output ./publish
+
+    - name: 'Deploy to server'
+      uses: rasmusbuchholdt/simply-web-deploy@2.2.0
+      with:
+        website-name: ${{ vars.Dev_WEBSITE_NAME }}
+        server-computer-name: ${{ vars.Dev_SERVER_COMPUTER_NAME }}
+        server-username: ${{ vars.Dev_SERVER_USERNAME }}
+        server-password: ${{ secrets.Dev_SERVER_PASSWORD }}
+        source-path: 'publish'
+        skip-files: 'web.config,appsettings.json'
