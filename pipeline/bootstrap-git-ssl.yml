@@ -1,0 +1,64 @@
+trigger: none
+
+pool:
+  name: DEV-POOL-CONTROL
+
+steps:
+- checkout: none
+
+- powershell: |
+    Write-Host "========================================"
+    Write-Host "      GIT SSL CONFIGURATION CHECK"
+    Write-Host "========================================"
+
+    Write-Host "`n=== Git Version ==="
+    git --version
+
+    Write-Host "`n=== Current Git SSL Configuration ==="
+
+    $globalSsl = git config --global --get http.sslVerify 2>$null
+    $systemSsl = git config --system --get http.sslVerify 2>$null
+
+    Write-Host "Global http.sslVerify: $globalSsl"
+    Write-Host "System http.sslVerify: $systemSsl"
+
+    Write-Host "`n=== Disabling Git SSL Verification ==="
+
+    git config --system http.sslVerify false
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Failed to configure Git system-wide."
+        exit 1
+    }
+
+    Write-Host "Git SSL verification disabled system-wide."
+
+    Write-Host "`n=== Verify Configuration ==="
+
+    $systemSsl = git config --system --get http.sslVerify
+    Write-Host "System http.sslVerify: $systemSsl"
+
+    if ($systemSsl -ne "false") {
+        Write-Error "Git SSL verification was not disabled successfully."
+        exit 1
+    }
+
+    Write-Host "`n=== Test Azure DevOps HTTPS Connection ==="
+
+    $url = "https://devops.ksaa.gov.sa"
+
+    git ls-remote $url
+
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "Successfully connected to Azure DevOps."
+    }
+    else {
+        Write-Warning "Unable to test Git repository access using the base URL."
+        Write-Host "The Git SSL workaround itself was applied successfully."
+    }
+
+    Write-Host "`n========================================"
+    Write-Host "       BOOTSTRAP COMPLETED"
+    Write-Host "========================================"
+
+  displayName: "Configure Git SSL Workaround"
